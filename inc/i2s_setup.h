@@ -11,7 +11,7 @@
 /* number of items in one half of the buffer (because we do our own double
  * buffering on a single array, addressing with no offset or an offset of one
  * half the total length of the array. */
-#define CODEC_DMA_BUF_LEN 128 
+#define CODEC_DMA_BUF_LEN 128
 
 #define UINT16_TO_FLOAT(x) ((float)((int32_t)x - 0x8000)/((float)0x8000))
 #define FLOAT_TO_UINT16(x) ((uint16_t)((x + 1.) * 0x8000))

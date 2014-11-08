@@ -39,6 +39,10 @@ static MIDI_Router_Standard midiRouter;
 
 MMSamplePlayerSigProc *spsps[MIDI_NUM_NOTES];
 
+#define TEST_ARRAY_LENGTH 10000 
+MMSample testArray[TEST_ARRAY_LENGTH];
+int testArrayIdx = TEST_ARRAY_LENGTH;
+
 MMSample waveTableMidiNum = 59;
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
@@ -47,9 +51,12 @@ void MIDI_note_on_do(void *data, MIDIMsg *msg)
         MMSamplePlayerSigProc *sp = 
             ((MMSamplePlayerSigProc**)data)[msg->data[1] - MIDI_BOTTOM_NOTE];
         ((MMSigProc*)sp)->state = MMSigProc_State_PLAYING;
+        ((MMSamplePlayerSigProc*)sp)->interp= MMInterpMethod_CUBIC;
         ((MMSamplePlayerSigProc*)sp)->index = 0;
-        ((MMSamplePlayerSigProc*)sp)->rate = pow(2.,
-            ((msg->data[1] - waveTableMidiNum) / 12.));
+//        ((MMSamplePlayerSigProc*)sp)->rate = pow(2.,
+//            ((msg->data[1] - 69) / 12.)) * 440.0 / WAVTABLE_FREQ;
+        ((MMSamplePlayerSigProc*)sp)->rate = 100.1;
+        testArrayIdx = 0;
     }
     MIDIMsg_free(msg);
 }
@@ -112,7 +119,7 @@ int main(void)
     /* Give access to samples of sound as wave table */
     MMWavTab samples;
     samples.data = sampleFileDataStart;
-    samples.length = sampleFileDataEnd - sampleFileDataStart;
+    samples.length = WAVTABLE_LENGTH_SAMPLES; // sampleFileDataEnd - sampleFileDataStart;
 
     /* Enable MIDI hardware */
     MIDI_low_level_setup();
@@ -147,6 +154,11 @@ int main(void)
              * channel */
 //            codecDmaTxPtr[i] = FLOAT_TO_INT16(WaveTable[curWaveTabIdx]);
 //            codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[curWaveTabIdx]);
+
+            if (testArrayIdx < TEST_ARRAY_LENGTH) {
+                testArray[testArrayIdx] = outBus->data[i/2] * 0.1;
+                testArrayIdx += 1;
+            }
             codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.1);
             codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.1);
 //            curWaveTabIdx += 100;
