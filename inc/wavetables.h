@@ -7,7 +7,7 @@
 
 #define WAVTABLE_FREQ ((MMSample)CODEC_SAMPLE_RATE / (MMSample)WAVTABLE_LENGTH_SAMPLES)
 
-#define WAVTABLE_NUM_PARTIALS   1
+#define WAVTABLE_NUM_PARTIALS   4
 
 extern MMSample WaveTable[];
 

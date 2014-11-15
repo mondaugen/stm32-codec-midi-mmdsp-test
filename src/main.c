@@ -39,10 +39,6 @@ static MIDI_Router_Standard midiRouter;
 
 MMSamplePlayerSigProc *spsps[MIDI_NUM_NOTES];
 
-#define TEST_ARRAY_LENGTH 10000 
-MMSample testArray[TEST_ARRAY_LENGTH];
-int testArrayIdx = TEST_ARRAY_LENGTH;
-
 MMSample waveTableMidiNum = 59;
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
@@ -53,10 +49,8 @@ void MIDI_note_on_do(void *data, MIDIMsg *msg)
         ((MMSigProc*)sp)->state = MMSigProc_State_PLAYING;
         ((MMSamplePlayerSigProc*)sp)->interp= MMInterpMethod_CUBIC;
         ((MMSamplePlayerSigProc*)sp)->index = 0;
-//        ((MMSamplePlayerSigProc*)sp)->rate = pow(2.,
-//            ((msg->data[1] - 69) / 12.)) * 440.0 / WAVTABLE_FREQ;
-        ((MMSamplePlayerSigProc*)sp)->rate = 100.1;
-        testArrayIdx = 0;
+        ((MMSamplePlayerSigProc*)sp)->rate = pow(2.,
+            ((msg->data[1] - 69) / 12.)) * 440.0 / WAVTABLE_FREQ;
     }
     MIDIMsg_free(msg);
 }
@@ -99,8 +93,7 @@ int main(void)
 
     /* A constant that zeros the bus each iteration */
     MMSigConst sigConst;
-    MMSigConst_init(&sigConst);
-    MMSigConst_setOutBus(&sigConst,outBus);
+    MMSigConst_init(&sigConst,outBus,0,MMSigConst_doSum_FALSE);
 
     /* A sample player */
     MMSamplePlayer samplePlayer;
@@ -155,12 +148,12 @@ int main(void)
 //            codecDmaTxPtr[i] = FLOAT_TO_INT16(WaveTable[curWaveTabIdx]);
 //            codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[curWaveTabIdx]);
 
-            if (testArrayIdx < TEST_ARRAY_LENGTH) {
-                testArray[testArrayIdx] = outBus->data[i/2] * 0.1;
-                testArrayIdx += 1;
-            }
-            codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.1);
-            codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.1);
+//            if (testArrayIdx < TEST_ARRAY_LENGTH) {
+//                testArray[testArrayIdx] = outBus->data[i/2] * 0.1;
+//                testArrayIdx += 1;
+//            }
+            codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
+            codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
 //            curWaveTabIdx += 100;
 //            if (curWaveTabIdx >= WAVTABLE_LENGTH_SAMPLES) {
 //                curWaveTabIdx -= WAVTABLE_LENGTH_SAMPLES;
