@@ -6,4 +6,6 @@
 *~
 *.swp
 *.gch
+*.dat
+*.ascii
 tags
