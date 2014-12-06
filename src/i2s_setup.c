@@ -10,7 +10,9 @@ int16_t codecDmaRxBuf[CODEC_DMA_BUF_LEN * 2];
 int16_t *codecDmaTxPtr = NULL;
 /* Which half of receive buffer we are at currently */
 int16_t *codecDmaRxPtr = NULL;
-
+/* Flag to check if processing is finished */
+int processingDone = 1;
+int numBufferUnderruns = 0;
 
 void i2s_setup(void)
 {
@@ -86,7 +88,9 @@ void i2s_full_duplex_setup(void)
     RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
     /* PLLI2S_R and PLLI2S_N have been setup in system_stm32f4xx.c */
     /* I2SDIV = 6, MCK on, ODD is set to 0 */
-    SPI3->I2SPR = ((0x2 << 8) | 0x6);
+//    SPI3->I2SPR = ((0x2 << 8) | 0x6); // 44.1Khz
+//    SPI3->I2SPR = ((0x2 << 8) | 13); // 16KHz
+    SPI3->I2SPR = ((0x3 << 8) | 0x6); // 32Khz
 //    SPI3->I2SPR = ((0x3 << 8) | 0xc);
     /* CKPOL = 0, I2SMOD = 1, I2SEN = 0 (don't enable yet), I2SSTD = 00
      * (Phillips), DATLEN = 00 (16-bit), CHLEN = 0 (16-bit) I2SCFGR = 10 (Master
@@ -311,7 +315,9 @@ void i2s_dma_full_duplex_setup(void)
     RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
     /* PLLI2S_R and PLLI2S_N have been setup in system_stm32f4xx.c */
     /* I2SDIV = 6, MCK on, ODD is set to 0 */
-    SPI3->I2SPR = ((0x2 << 8) | 0x6);
+    SPI3->I2SPR = ((0x2 << 8) | 0x6); // 44.1Khz
+//    SPI3->I2SPR = ((0x2 << 8) | 13); // 16KHz
+//    SPI3->I2SPR = ((0x3 << 8) | 0x6); // 32Khz
 //    SPI3->I2SPR = ((0x3 << 8) | 0xc);
     /* CKPOL = 0, I2SMOD = 1, I2SEN = 0 (don't enable yet), I2SSTD = 00
      * (Phillips), DATLEN = 00 (16-bit), CHLEN = 0 (16-bit) I2SCFGR = 10 (Master
@@ -376,13 +382,23 @@ void DMA1_Stream5_IRQHandler(void)
     if (DMA1->HISR & DMA_HISR_TCIF5) {
         /* clear flag */
         DMA1->HIFCR = DMA_HIFCR_CTCIF5;
-        codecDmaTxPtr = codecDmaTxBuf + CODEC_DMA_BUF_LEN;
+        if (processingDone) {
+            processingDone = 0;
+            codecDmaTxPtr = codecDmaTxBuf + CODEC_DMA_BUF_LEN;
+        } else {
+            numBufferUnderruns += 1;
+        }
     }
     /* If half of transfer complete on stream 5 (memory to peripheral), set current tx
      * pointer to beginning of the buffer */
     if (DMA1->HISR & DMA_HISR_HTIF5) {
         /* clear flag */
         DMA1->HIFCR = DMA_HIFCR_CHTIF5;
-        codecDmaTxPtr = codecDmaTxBuf;
+        if (processingDone) {
+            processingDone = 0;
+            codecDmaTxPtr = codecDmaTxBuf;
+        } else {
+            numBufferUnderruns += 1;
+        }
     }
 }

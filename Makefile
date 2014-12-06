@@ -80,7 +80,7 @@ MMDSP_SRCS      = $(wildcard $(MMDSP_SRCS_PATH)/*.c)
 MMDSP_INC_PATH  = $(MMDSP_PATH)/inc
 MMDSP_OBJS      = $(MMDSP_SRCS:$(MMDSP_SRCS_PATH)/%.c=objs/%.o)
 MMDSP_DEP       = $(wildcard $(MMDSP_INC_PATH)/*.h)
-MMDSP_CFLAGS	= -O3
+MMDSP_CFLAGS	= -Ofast
 
 MMPRIMITIVES_PATH      = $(HOME)/Documents/development/mm_primitives
 MMPRIMITIVES_SRCS_PATH = $(MMPRIMITIVES_PATH)/src
@@ -88,6 +88,7 @@ MMPRIMITIVES_SRCS      = $(wildcard $(MMPRIMITIVES_SRCS_PATH)/*.c)
 MMPRIMITIVES_INC_PATH  = $(MMPRIMITIVES_PATH)/inc
 MMPRIMITIVES_OBJS      = $(MMPRIMITIVES_SRCS:$(MMPRIMITIVES_SRCS_PATH)/%.c=objs/%.o)
 MMPRIMITIVES_DEP       = $(wildcard $(MMPRIMITIVES_INC_PATH)/*.h)
+MMPRIMITIVES_CFLAGS	= -Ofast
 
 NEDATASTRUCTURES_PATH      = $(HOME)/Documents/development/ne_datastructures
 NEDATASTRUCTURES_SRCS_PATH = $(NEDATASTRUCTURES_PATH)/src
@@ -162,7 +163,7 @@ $(MMDSP_OBJS): objs/%.o: $(MMDSP_SRCS_PATH)/%.c $(MMDSP_DEP)
 	
 # compile mm_primitives
 $(MMPRIMITIVES_OBJS): objs/%.o: $(MMPRIMITIVES_SRCS_PATH)/%.c $(MMPRIMITIVES_DEP)
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ $(MMPRIMITIVES_CFLAGS)
 
 # compile ne_datastructures 
 $(NEDATASTRUCTURES_OBJS): objs/%.o: $(NEDATASTRUCTURES_SRCS_PATH)/%.c $(NEDATASTRUCTURES_DEP)
@@ -193,6 +194,9 @@ flash: $(BIN)
 	    -c "flash write_image erase $(BIN)" \
 		-c "reset run" \
 	    -c shutdown
+
+reset: $(BIN)
+	$(OCD) -c init -c "reset run" -c shutdown
 
 clean:
 	rm objs/*

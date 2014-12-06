@@ -4,7 +4,7 @@
 #include <stdint.h> 
 #include <stddef.h> 
 
-#define CODEC_SAMPLE_RATE 44100 
+#define CODEC_SAMPLE_RATE 32000//16000//44100 
 
 #define CODEC_NUM_CHANNELS 2
 
@@ -20,6 +20,8 @@
 
 extern int16_t *codecDmaRxPtr;
 extern int16_t *codecDmaTxPtr;
+extern int processingDone;
+extern int numBufferUnderruns;
 
 void i2s_setup(void);
 void i2s_full_duplex_setup(void);

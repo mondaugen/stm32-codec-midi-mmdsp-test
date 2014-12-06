@@ -153,8 +153,12 @@
 /* USB OTG FS, SDIO and RNG Clock =  PLL_VCO / PLLQ */
 #define PLL_Q      7
 
-/* PLLI2S dividers giving 44100KHz Sampling Rate */
-#define PLLI2S_N 271
+/* PLLI2S dividers giving 44.1KHz Sampling Rate */
+ #define PLLI2S_N 271
+/* PLLI2S dividers giving 16KHz Sampling Rate */
+//#define PLLI2S_N 213
+/* PLLI2S dividers giving 16KHz Sampling Rate */
+//#define PLLI2S_N 213
 
 #define PLLI2S_R  2
 
