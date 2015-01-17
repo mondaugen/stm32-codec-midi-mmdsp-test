@@ -27,13 +27,13 @@
 
 #define MIDI_BOTTOM_NOTE 48
 #define MIDI_TOP_NOTE    60
-#define MIDI_NUM_NOTES   5
+#define MIDI_NUM_NOTES   8
 
 #define BUS_NUM_CHANS 1
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
 
-#define ATTACK_TIME  2
-#define RELEASE_TIME 2 
+#define ATTACK_TIME 0.01 
+#define RELEASE_TIME 0.5 
 #define SHORT_RELEASE_TIME 0.2
 
 //extern MMSample GrandPianoFileDataStart;
@@ -62,7 +62,7 @@ void MIDI_note_on_do(void *data, MIDIMsg *msg)
     params->releaseTime = SHORT_RELEASE_TIME; 
     params->samples = &samples;
     params->loop = 1;
-    MMPolyManager_noteOn(pvm, (void*)params, MMPolyManagerSteal_FALSE);
+    MMPolyManager_noteOn(pvm, (void*)params, MMPolyManagerSteal_TRUE);
     MIDIMsg_free(msg);
 }
 
