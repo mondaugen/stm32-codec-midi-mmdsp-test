@@ -80,7 +80,7 @@ MMDSP_SRCS      = $(wildcard $(MMDSP_SRCS_PATH)/*.c)
 MMDSP_INC_PATH  = $(MMDSP_PATH)/inc
 MMDSP_OBJS      = $(MMDSP_SRCS:$(MMDSP_SRCS_PATH)/%.c=objs/%.o)
 MMDSP_DEP       = $(wildcard $(MMDSP_INC_PATH)/*.h)
-MMDSP_CFLAGS	= -O0 #-Ofast
+MDSP_CFLAGS	= -O0 #-Ofast
 
 MMPRIMITIVES_PATH      = $(HOME)/Documents/development/mm_primitives
 MMPRIMITIVES_SRCS_PATH = $(MMPRIMITIVES_PATH)/src
