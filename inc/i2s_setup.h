@@ -4,7 +4,7 @@
 #include <stdint.h> 
 #include <stddef.h> 
 
-#define CODEC_SAMPLE_RATE 32000//16000//44100 
+#define CODEC_SAMPLE_RATE 16000//32000//16000//44100 
 
 #define CODEC_NUM_CHANNELS 2
 
