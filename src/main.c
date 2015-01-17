@@ -82,9 +82,8 @@ int main(void)
     MMSample *sampleFileDataStart = WaveTable;
     size_t i;
 
-
-    /* Enable LEDs so we can toggle them */
-    LEDs_Init();
+    /* Enable signalling routines for errors */
+    error_sig_init();
 
     codecDmaTxPtr = NULL;
     codecDmaRxPtr = NULL;

@@ -1,6 +1,7 @@
 #include "stm32f4xx.h"
 #include <math.h>
 #include "i2s_setup.h" 
+#include "error_sig.h" 
 
 /* Where data to be transferred to CODEC reside */
 int16_t codecDmaTxBuf[CODEC_DMA_BUF_LEN * 2];
@@ -14,7 +15,54 @@ int16_t *codecDmaRxPtr = NULL;
 int processingDone = 1;
 int numBufferUnderruns = 0;
 
-void i2s_dma_full_duplex_setup(void)
+/* This assumes i2s is configured as master */
+int i2s_clock_setup(uint32_t sr)
+{
+    /* Disable PLLI2S */
+    RCC->CR &= ((uint32_t)(~RCC_CR_PLLI2SON));
+
+    /* PLLI2S clock used as I2S clock source */
+    RCC->CFGR &= ~RCC_CFGR_I2SSRC;
+
+    /* Configure PLLI2S */
+    /* see stm32f4 reference manual, p. 894 */
+    switch(sr) {
+        case 44100:
+            RCC->PLLI2SCFGR = (271 << 6) | (2 << 28);
+            SPI3->I2SPR     = ((0x2 << 8) | 0x6); // 44.1Khz
+            I2S3ext->I2SPR  = ((0x2 << 8) | 0x6);
+            break;
+        case 16000:
+            RCC->PLLI2SCFGR = (213 << 6) | (2 << 28);
+            SPI3->I2SPR     = ((0x2 << 8) | 13); // 16KHz
+            I2S3ext->I2SPR  = ((0x2 << 8) | 13);
+            break;
+        case 32000:
+            RCC->PLLI2SCFGR = (213 << 6) | (2 << 28);
+            SPI3->I2SPR     = ((0x3 << 8) | 0x6); // 32Khz
+            I2S3ext->I2SPR  = ((0x3 << 8) | 0x6);
+            break;
+        default:
+            return -1; /* bad sampling rate */
+    }
+
+    /* Enable PLLI2S */
+    RCC->CR |= ((uint32_t)RCC_CR_PLLI2SON);
+
+    /* start indicator light incase program gets stuck here */
+    error_sig_started_waiting();
+
+    /* Wait till PLLI2S is ready */
+    while((RCC->CR & RCC_CR_PLLI2SRDY) == 0);
+
+    /* pll is ready, turn off error indication */
+    error_sig_stopped_waiting();
+
+    return 0;
+}
+
+/* takes desired sampling rate, throws error if bad sampling rate */
+void i2s_dma_full_duplex_setup(uint32_t sr)
 {
     /* Turn on GPIO clock for I2S3 pins */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOCEN;
@@ -154,12 +202,12 @@ void i2s_dma_full_duplex_setup(void)
 
     /* Turn on I2S3 clock (SPI3) */
     RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
-    /* PLLI2S_R and PLLI2S_N have been setup in system_stm32f4xx.c */
-    /* I2SDIV = 6, MCK on, ODD is set to 0 */
-//    SPI3->I2SPR = ((0x2 << 8) | 0x6); // 44.1Khz
-    SPI3->I2SPR = ((0x2 << 8) | 13); // 16KHz
-//    SPI3->I2SPR = ((0x3 << 8) | 0x6); // 32Khz
-//    SPI3->I2SPR = ((0x3 << 8) | 0xc);
+    /* set up clock dividers for desired sampling rate */
+    if (i2s_clock_setup(sr)) {
+        /* bad sampling rate, throw error and wait here */
+        error_sig_started_waiting();
+        while(1);
+    }
     /* CKPOL = 0, I2SMOD = 1, I2SEN = 0 (don't enable yet), I2SSTD = 00
      * (Phillips), DATLEN = 00 (16-bit), CHLEN = 0 (16-bit) I2SCFGR = 10 (Master
      * transmit) */
@@ -168,8 +216,6 @@ void i2s_dma_full_duplex_setup(void)
     SPI3->CR2 = SPI_CR2_TXDMAEN ;
     /* Set up duplex instance the same as SPI3, except configure as slave
      * receive and trigger interrupt when receive buffer full */
-//    I2S3ext->I2SPR = ((0x3 << 8) | 0xc);
-    I2S3ext->I2SPR = ((0x2 << 8) | 0x6);
     /* same as above but I2SCFG = 01 (slave receive) */
     I2S3ext->I2SCFGR = 0x900;
     /* RXDMAEN = 1 (Receive buffer not empty DMA request enable), other bits off */
