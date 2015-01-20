@@ -8,7 +8,7 @@
 /* Initialize hardware needed to indicate errors */
 static inline void error_sig_init(void)
 {
-    LEDs_init();
+    LEDs_Init();
 }
 
 static inline void error_sig_started_waiting(void)

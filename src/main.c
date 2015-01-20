@@ -6,6 +6,7 @@
 #include "stm32f4xx.h" 
 #include "leds.h" 
 #include "main.h" 
+#include "error_sig.h" 
 #include "i2s_setup.h" 
 #include "midi_lowlevel.h"
 
@@ -89,7 +90,7 @@ int main(void)
     codecDmaRxPtr = NULL;
     
     /* Enable codec */
-    i2s_dma_full_duplex_setup();
+    i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
 
     /* The bus the signal chain is reading/writing */
     MMBus *outBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
@@ -109,8 +110,9 @@ int main(void)
     WaveTable_init();
 
     /* Give access to samples of sound as wave table */
-    samples.data = sampleFileDataStart;
-    samples.length = WAVTABLE_LENGTH_SAMPLES; // sampleFileDataEnd - sampleFileDataStart;
+    MMArray_set_data(&samples, sampleFileDataStart);
+    MMArray_set_length(&samples, WAVTABLE_LENGTH_SAMPLES); 
+    samples.samplerate = CODEC_SAMPLE_RATE;
 
     /* Make poly voice manager */
     pvm = MMPolyManager_new(MIDI_NUM_NOTES);
@@ -143,6 +145,10 @@ int main(void)
         for (i = 0; i < CODEC_DMA_BUF_LEN; i += 2) {
             codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
             codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
+            /*
+            codecDmaTxPtr[i] = 0xa440;
+            codecDmaTxPtr[i+1] = 0xa440;
+            */
         }
         codecDmaTxPtr = NULL;
         codecDmaRxPtr = NULL;

@@ -56,7 +56,7 @@ int i2s_clock_setup(uint32_t sr)
     while((RCC->CR & RCC_CR_PLLI2SRDY) == 0);
 
     /* pll is ready, turn off error indication */
-    error_sig_stopped_waiting();
+    error_sig_done_waiting();
 
     return 0;
 }

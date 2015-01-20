@@ -73,6 +73,7 @@ MMMIDI_SRCS      = $(wildcard $(MMMIDI_SRCS_PATH)/*.c)
 MMMIDI_INC_PATH  = $(MMMIDI_PATH)/inc
 MMMIDI_OBJS      = $(MMMIDI_SRCS:$(MMMIDI_SRCS_PATH)/%.c=objs/%.o)
 MMMIDI_DEP       = $(wildcard $(MMMIDI_INC_PATH)/*.h)
+MMMIDI_CFLAGS	= -Ofast
 
 MMDSP_PATH      = $(HOME)/Documents/development/mm_dsp
 MMDSP_SRCS_PATH = $(MMDSP_PATH)/src
@@ -96,6 +97,7 @@ NEDATASTRUCTURES_SRCS      = $(wildcard $(NEDATASTRUCTURES_SRCS_PATH)/*.c)
 NEDATASTRUCTURES_INC_PATH  = $(NEDATASTRUCTURES_PATH)/inc
 NEDATASTRUCTURES_OBJS      = $(NEDATASTRUCTURES_SRCS:$(NEDATASTRUCTURES_SRCS_PATH)/%.c=objs/%.o)
 NEDATASTRUCTURES_DEP       = $(wildcard $(NEDATASTRUCTURES_INC_PATH)/*.h)
+NEDATASTRUCTURES_CFLAGS	= -Ofast
 
 PROJ_INC_PATH = ./inc
 
@@ -155,7 +157,7 @@ $(STM_DRIVER_OBJS): objs/%.o: $(STM_DRIVER_PATH)/src/%.c $(STM_DRIVER_DEP)
 
 # compile mmmidi
 $(MMMIDI_OBJS): objs/%.o: $(MMMIDI_SRCS_PATH)/%.c $(MMMIDI_DEP)
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ $(MMMIDI_CFLAGS)
 	
 # compile mmdsp 
 $(MMDSP_OBJS): objs/%.o: $(MMDSP_SRCS_PATH)/%.c $(MMDSP_DEP) 
@@ -167,7 +169,7 @@ $(MMPRIMITIVES_OBJS): objs/%.o: $(MMPRIMITIVES_SRCS_PATH)/%.c $(MMPRIMITIVES_DEP
 
 # compile ne_datastructures 
 $(NEDATASTRUCTURES_OBJS): objs/%.o: $(NEDATASTRUCTURES_SRCS_PATH)/%.c $(NEDATASTRUCTURES_DEP)
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ $(NEDATASTRUCTURES_CFLAGS)
 
 # compile asm
 $(PROJ_OBJS_ASM): objs/%.o: $(PROJ_SRCS_PATH)/%.s $(PROJ_DEP)
