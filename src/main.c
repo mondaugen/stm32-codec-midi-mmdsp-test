@@ -107,8 +107,8 @@ int main(void)
 
     /* Give access to samples of sound as wave table */
     MMWavTab samples;
-    samples.data = sampleFileDataStart;
-    samples.length = WAVTABLE_LENGTH_SAMPLES; // sampleFileDataEnd - sampleFileDataStart;
+    MMArray_set_data(&samples, sampleFileDataStart);
+    MMArray_set_length(&samples,WAVTABLE_LENGTH_SAMPLES);
 
     /* Enable MIDI hardware */
     MIDI_low_level_setup();

@@ -156,8 +156,8 @@ void i2s_dma_full_duplex_setup(void)
     RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
     /* PLLI2S_R and PLLI2S_N have been setup in system_stm32f4xx.c */
     /* I2SDIV = 6, MCK on, ODD is set to 0 */
-//    SPI3->I2SPR = ((0x2 << 8) | 0x6); // 44.1Khz
-    SPI3->I2SPR = ((0x2 << 8) | 13); // 16KHz
+    SPI3->I2SPR = ((0x2 << 8) | 0x6); // 44.1Khz
+//    SPI3->I2SPR = ((0x2 << 8) | 13); // 16KHz
 //    SPI3->I2SPR = ((0x3 << 8) | 0x6); // 32Khz
 //    SPI3->I2SPR = ((0x3 << 8) | 0xc);
     /* CKPOL = 0, I2SMOD = 1, I2SEN = 0 (don't enable yet), I2SSTD = 00
