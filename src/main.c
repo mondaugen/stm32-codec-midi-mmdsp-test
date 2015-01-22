@@ -27,10 +27,12 @@
 #define MIDI_TOP_NOTE    60
 #define MIDI_NUM_NOTES   (MIDI_TOP_NOTE - MIDI_BOTTOM_NOTE)
 
+#define NUM_NOTES_PLAYING 7 
+
 #define BUS_NUM_CHANS 1
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
 
-#define ATTACK_TIME 2 
+#define ATTACK_TIME 5 
 #define RELEASE_TIME 2 
 
 //extern MMSample GrandPianoFileDataStart;
@@ -41,6 +43,24 @@ static MIDIMsgBuilder midiMsgBuilder;
 static MIDI_Router_Standard midiRouter;
 
 MMTrapEnvedSamplePlayer spsps[MIDI_NUM_NOTES];
+
+void dumb_on(int note)
+{
+        MMTrapEnvedSamplePlayer *tesp = (MMTrapEnvedSamplePlayer*)spsps 
+            + note - MIDI_BOTTOM_NOTE;
+        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).interp =
+            MMInterpMethod_CUBIC;
+        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).index = 0;
+        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).rate =
+            pow(2., (note - 69.) / 10.) * 440.0 / WAVTABLE_FREQ;
+        MMSigProc_setState(
+                &MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp),
+                MMSigProc_State_PLAYING);
+        MMTrapezoidEnv_init(&MMTrapEnvedSamplePlayer_getTrapezoidEnv(tesp),
+            0, 1., ATTACK_TIME, RELEASE_TIME);
+        MMEnvelope_startAttack(&MMTrapEnvedSamplePlayer_getTrapezoidEnv(tesp));
+}
+
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
 {
@@ -111,13 +131,13 @@ int main(void)
     MMArray_set_length(&samples,WAVTABLE_LENGTH_SAMPLES);
 
     /* Enable MIDI hardware */
-    MIDI_low_level_setup();
+//    MIDI_low_level_setup();
 
     /* Initialize MIDI Message builder */
-    MIDIMsgBuilder_init(&midiMsgBuilder);
+//    MIDIMsgBuilder_init(&midiMsgBuilder);
 
     /* set up the MIDI router to trigger samples */
-    MIDI_Router_Standard_init(&midiRouter);
+//    MIDI_Router_Standard_init(&midiRouter);
     for (i = 0; i < MIDI_NUM_NOTES; i++) {
         MMTrapEnvedSamplePlayer_init(&spsps[i], outBus, BUS_BLOCK_SIZE, 
                 1. / (MMSample)CODEC_SAMPLE_RATE);
@@ -134,8 +154,11 @@ int main(void)
         /* insert in signal chain after sig const*/
         MMSigProc_insertAfter(&sigConst, &spsps[i]);
     }
-    MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
-    MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
+//    MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
+//    MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
+    for (i = 0; i < NUM_NOTES_PLAYING; i++) {
+        dumb_on(i + MIDI_BOTTOM_NOTE);
+    }
 
     while (1) {
         while (!(codecDmaTxPtr && codecDmaRxPtr));
