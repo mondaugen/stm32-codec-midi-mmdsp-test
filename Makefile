@@ -127,7 +127,7 @@ BIN = main.elf
 DEFS    = USE_STDPERIPH_DRIVER $(STM_CHIP_SET)#STM32F429_439xx
 CFLAGS  = -ggdb3 -gdwarf-4 -Wall -ffunction-sections -fdata-sections
 CFLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
-CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16 -O0 -dD
+CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16 -dD
 CFLAGS += $(foreach inc,$(INC),-I$(inc))
 CFLAGS += $(foreach def,$(DEFS),-D$(def))
 

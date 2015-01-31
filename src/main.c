@@ -28,7 +28,7 @@
 
 #define MIDI_BOTTOM_NOTE 48
 #define MIDI_TOP_NOTE    60
-#define MIDI_NUM_NOTES   4
+#define MIDI_NUM_NOTES   7
 
 #define BUS_NUM_CHANS 1
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
@@ -88,9 +88,6 @@ int main(void)
 
     codecDmaTxPtr = NULL;
     codecDmaRxPtr = NULL;
-    
-    /* Enable codec */
-    i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
 
     /* The bus the signal chain is reading/writing */
     MMBus *outBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
@@ -137,6 +134,9 @@ int main(void)
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
 
+    /* Enable codec */
+    i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
+
     while (1) {
         while (!(codecDmaTxPtr && codecDmaRxPtr));
         MIDI_process_buffer(); /* process MIDI at most every audio block */
@@ -152,7 +152,6 @@ int main(void)
         }
         codecDmaTxPtr = NULL;
         codecDmaRxPtr = NULL;
-        processingDone = 1;
     }
 }
 

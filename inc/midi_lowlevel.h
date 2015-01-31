@@ -7,8 +7,8 @@
 
 /* This should be automated according to current clock speed and dividers, keep
  * it simple for now */
-#define MIDI_TIMER_PERIOD_TICKS 450000 
-#define MIDI_TIMER_PERIOD_MS    10
+#define MIDI_TIMER_PERIOD_TICKS 900000//450000 
+#define MIDI_TIMER_PERIOD_MS    20
 
 #define MIDI_BAUD_RATE 31250 
 /* The number of bytes per midi timer period, rounded up and then multiplied by

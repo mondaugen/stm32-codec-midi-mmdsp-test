@@ -269,23 +269,13 @@ void DMA1_Stream5_IRQHandler(void)
     if (DMA1->HISR & DMA_HISR_TCIF5) {
         /* clear flag */
         DMA1->HIFCR = DMA_HIFCR_CTCIF5;
-        if (processingDone) {
-            processingDone = 0;
-            codecDmaTxPtr = codecDmaTxBuf + CODEC_DMA_BUF_LEN;
-        } else {
-            numBufferUnderruns += 1;
-        }
+        codecDmaTxPtr = codecDmaTxBuf + CODEC_DMA_BUF_LEN;
     }
     /* If half of transfer complete on stream 5 (memory to peripheral), set current tx
      * pointer to beginning of the buffer */
     if (DMA1->HISR & DMA_HISR_HTIF5) {
         /* clear flag */
         DMA1->HIFCR = DMA_HIFCR_CHTIF5;
-        if (processingDone) {
-            processingDone = 0;
-            codecDmaTxPtr = codecDmaTxBuf;
-        } else {
-            numBufferUnderruns += 1;
-        }
+        codecDmaTxPtr = codecDmaTxBuf;
     }
 }
