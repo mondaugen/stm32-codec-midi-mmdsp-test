@@ -24,7 +24,8 @@
 #include "mm_sigconst.h"
 #include "wavetables.h" 
 #include "mm_poly_voice_manage.h"
-#include "mmpv_tesp.h" 
+#include "mmpv_tesp.h"
+#include "mm_wavtab_recorder.h"
 
 #define MIDI_BOTTOM_NOTE 48
 #define MIDI_TOP_NOTE    60
@@ -49,6 +50,8 @@ static MMTrapEnvedSamplePlayer spsps[MIDI_NUM_NOTES];
 static MMPolyManager *pvm;
 
 static MMWavTab samples;
+
+static MMWavTabRecorder wtr;
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
 {
@@ -78,6 +81,13 @@ void MIDI_note_off_do(void *data, MIDIMsg *msg)
     MIDIMsg_free(msg);
 }
 
+void MIDI_cc_do(void *data, MIDIMsg *msg)
+{
+    /* start recording */
+    ((MMWavTabRecorder*)data)->currentIndex = 0;
+    ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_RECORDING;
+}
+
 int main(void)
 {
     MMSample *sampleFileDataStart = WaveTable;
@@ -89,7 +99,10 @@ int main(void)
     codecDmaTxPtr = NULL;
     codecDmaRxPtr = NULL;
 
-    /* The bus the signal chain is reading/writing */
+    /* The bus the signal chain is reading */
+    MMBus *inBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
+
+    /* The bus the signal chain is writing */
     MMBus *outBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
 
     /* a signal chain to put the signal processors into */
@@ -110,6 +123,16 @@ int main(void)
     MMArray_set_data(&samples, sampleFileDataStart);
     MMArray_set_length(&samples, WAVTABLE_LENGTH_SAMPLES); 
     samples.samplerate = CODEC_SAMPLE_RATE;
+
+    /* Allow MMWavTabRecorder to record into samples */
+    MMWavTabRecorder_init(&wtr);
+    wtr.buffer = &samples;
+    wtr.inputBus = inBus;
+    wtr.currentIndex = 0;
+    wtr.state = MMWavTabRecorderState_RECORDING;
+
+    /* Put MMWavTabRecorder at the top of the signal chain */
+    MMSigProc_insertAfter(&sigChain.sigProcs,&wtr);
 
     /* Make poly voice manager */
     pvm = MMPolyManager_new(MIDI_NUM_NOTES);
@@ -133,6 +156,7 @@ int main(void)
     }
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],2,MIDI_cc_do,&wtr);
 
     /* Enable codec */
     i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
@@ -143,12 +167,11 @@ int main(void)
         MMSigProc_tick(&sigChain);
         size_t i;
         for (i = 0; i < CODEC_DMA_BUF_LEN; i += 2) {
+            /* write out data */
             codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
             codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
-            /*
-            codecDmaTxPtr[i] = 0xa440;
-            codecDmaTxPtr[i+1] = 0xa440;
-            */
+            /* read in data */
+            inBus->data[i/2] = INT16_TO_FLOAT(codecDmaRxPtr[i+1]);
         }
         codecDmaTxPtr = NULL;
         codecDmaRxPtr = NULL;
