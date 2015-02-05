@@ -96,6 +96,9 @@ int main(void)
     /* Enable signalling routines for errors */
     error_sig_init();
 
+    /* Enable external SRAM */
+    FMC_Config();
+
     codecDmaTxPtr = NULL;
     codecDmaRxPtr = NULL;
 
@@ -120,9 +123,11 @@ int main(void)
     WaveTable_init();
 
     /* Give access to samples of sound as wave table */
-    MMArray_set_data(&samples, sampleFileDataStart);
+    MMArray_set_data(&samples, WaveTable);
     MMArray_set_length(&samples, WAVTABLE_LENGTH_SAMPLES); 
-    samples.samplerate = CODEC_SAMPLE_RATE;
+    /* Set with this samplerate so it plays at normal speed when midi note 69
+     * received */
+    samples.samplerate = 440 * WAVTABLE_LENGTH_SAMPLES;//CODEC_SAMPLE_RATE;
 
     /* Allow MMWavTabRecorder to record into samples */
     MMWavTabRecorder_init(&wtr);

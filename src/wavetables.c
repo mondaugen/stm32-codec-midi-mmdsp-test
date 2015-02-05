@@ -2,8 +2,9 @@
 #include <string.h>
 #include <math.h> 
 #include "wavetables.h"
+#include "fmc.h" 
 
-MMSample WaveTable[WAVTABLE_LENGTH_SAMPLES];
+MMSample *WaveTable;
 
 MMSample WaveTable_midiNumber(void)
 {
@@ -12,6 +13,8 @@ MMSample WaveTable_midiNumber(void)
 
 void WaveTable_init(void)
 {
+    WaveTable = (MMSample*)SDRAM_BANK_ADDR;
+    /*
     size_t i,j;
     memset(WaveTable,0,sizeof(MMSample) * WAVTABLE_LENGTH_SAMPLES);
     for (i = 0; i < WAVTABLE_LENGTH_SAMPLES; i++) {
@@ -20,5 +23,6 @@ void WaveTable_init(void)
                     * (j + 1) * M_PI * 2.) / (MMSample)(j + 1);
         }
     }
+    */
 }
 
