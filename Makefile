@@ -1,6 +1,7 @@
 # The driver is compiled in different ways, depending on what chip we are
 # compiling for.
 
+OPTIMIZE?=1
 DEBUG_BUILD?=1
 STM_CHIP_SET=STM32F429_439xx
 STM_DRIVER_PATH = $(HOME)/Documents/archives/STM32F4xx_DSP_StdPeriph_Lib_V1.3.0/Libraries/STM32F4xx_StdPeriph_Driver
@@ -73,6 +74,9 @@ MMMIDI_SRCS      = $(wildcard $(MMMIDI_SRCS_PATH)/*.c)
 MMMIDI_INC_PATH  = $(MMMIDI_PATH)/inc
 MMMIDI_OBJS      = $(MMMIDI_SRCS:$(MMMIDI_SRCS_PATH)/%.c=objs/%.o)
 MMMIDI_DEP       = $(wildcard $(MMMIDI_INC_PATH)/*.h)
+ifeq ($(OPTIMIZE),1)
+	MMMIDI_CFLAGS	= -Ofast
+endif
 
 MMDSP_PATH      = $(HOME)/Documents/development/mm_dsp
 MMDSP_SRCS_PATH = $(MMDSP_PATH)/src
@@ -80,7 +84,9 @@ MMDSP_SRCS      = $(wildcard $(MMDSP_SRCS_PATH)/*.c)
 MMDSP_INC_PATH  = $(MMDSP_PATH)/inc
 MMDSP_OBJS      = $(MMDSP_SRCS:$(MMDSP_SRCS_PATH)/%.c=objs/%.o)
 MMDSP_DEP       = $(wildcard $(MMDSP_INC_PATH)/*.h)
-MMDSP_CFLAGS	= -Ofast
+ifeq ($(OPTIMIZE),1)
+	MMDSP_CFLAGS	= -Ofast
+endif
 
 MMPRIMITIVES_PATH      = $(HOME)/Documents/development/mm_primitives
 MMPRIMITIVES_SRCS_PATH = $(MMPRIMITIVES_PATH)/src
@@ -88,7 +94,9 @@ MMPRIMITIVES_SRCS      = $(wildcard $(MMPRIMITIVES_SRCS_PATH)/*.c)
 MMPRIMITIVES_INC_PATH  = $(MMPRIMITIVES_PATH)/inc
 MMPRIMITIVES_OBJS      = $(MMPRIMITIVES_SRCS:$(MMPRIMITIVES_SRCS_PATH)/%.c=objs/%.o)
 MMPRIMITIVES_DEP       = $(wildcard $(MMPRIMITIVES_INC_PATH)/*.h)
-MMPRIMITIVES_CFLAGS	= -Ofast
+ifeq ($(OPTIMIZE),1)
+	MMPRIMITIVES_CFLAGS	= -Ofast
+endif
 
 NEDATASTRUCTURES_PATH      = $(HOME)/Documents/development/ne_datastructures
 NEDATASTRUCTURES_SRCS_PATH = $(NEDATASTRUCTURES_PATH)/src
@@ -96,6 +104,9 @@ NEDATASTRUCTURES_SRCS      = $(wildcard $(NEDATASTRUCTURES_SRCS_PATH)/*.c)
 NEDATASTRUCTURES_INC_PATH  = $(NEDATASTRUCTURES_PATH)/inc
 NEDATASTRUCTURES_OBJS      = $(NEDATASTRUCTURES_SRCS:$(NEDATASTRUCTURES_SRCS_PATH)/%.c=objs/%.o)
 NEDATASTRUCTURES_DEP       = $(wildcard $(NEDATASTRUCTURES_INC_PATH)/*.h)
+ifeq ($(OPTIMIZE),1)
+	NEDATASTRUCTURES_CFLAGS	= -Ofast
+endif
 
 PROJ_INC_PATH = ./inc
 
@@ -125,7 +136,7 @@ BIN = main.elf
 DEFS    = USE_STDPERIPH_DRIVER $(STM_CHIP_SET)#STM32F429_439xx
 CFLAGS  = -ggdb3 -gdwarf-4 -Wall -ffunction-sections -fdata-sections
 CFLAGS += -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork
-CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16 -O0 -dD
+CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16 -dD
 CFLAGS += $(foreach inc,$(INC),-I$(inc))
 CFLAGS += $(foreach def,$(DEFS),-D$(def))
 
@@ -155,7 +166,7 @@ $(STM_DRIVER_OBJS): objs/%.o: $(STM_DRIVER_PATH)/src/%.c $(STM_DRIVER_DEP)
 
 # compile mmmidi
 $(MMMIDI_OBJS): objs/%.o: $(MMMIDI_SRCS_PATH)/%.c $(MMMIDI_DEP)
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ $(MMMIDI_CFLAGS)
 	
 # compile mmdsp 
 $(MMDSP_OBJS): objs/%.o: $(MMDSP_SRCS_PATH)/%.c $(MMDSP_DEP) 
@@ -167,7 +178,7 @@ $(MMPRIMITIVES_OBJS): objs/%.o: $(MMPRIMITIVES_SRCS_PATH)/%.c $(MMPRIMITIVES_DEP
 
 # compile ne_datastructures 
 $(NEDATASTRUCTURES_OBJS): objs/%.o: $(NEDATASTRUCTURES_SRCS_PATH)/%.c $(NEDATASTRUCTURES_DEP)
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ $(NEDATASTRUCTURES_CFLAGS)
 
 # compile asm
 $(PROJ_OBJS_ASM): objs/%.o: $(PROJ_SRCS_PATH)/%.s $(PROJ_DEP)

@@ -6,8 +6,10 @@
 #include "stm32f4xx.h" 
 #include "leds.h" 
 #include "main.h" 
+#include "error_sig.h" 
 #include "i2s_setup.h" 
 #include "midi_lowlevel.h"
+#include "fmc.h" 
 
 /* mmmidi includes */
 #include "mm_midimsgbuilder.h"
@@ -22,16 +24,20 @@
 #include "mm_wavtab.h"
 #include "mm_sigconst.h"
 #include "wavetables.h" 
+#include "mm_poly_voice_manage.h"
+#include "mmpv_tesp.h"
+#include "mm_wavtab_recorder.h"
 
 #define MIDI_BOTTOM_NOTE 48
 #define MIDI_TOP_NOTE    60
-#define MIDI_NUM_NOTES   (MIDI_TOP_NOTE - MIDI_BOTTOM_NOTE)
+#define MIDI_NUM_NOTES   12
 
 #define BUS_NUM_CHANS 1
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
 
-#define ATTACK_TIME 2 
-#define RELEASE_TIME 2 
+#define ATTACK_TIME 0.01 
+#define RELEASE_TIME 0.01 
+#define SHORT_RELEASE_TIME 0.01
 
 //extern MMSample GrandPianoFileDataStart;
 //extern MMSample GrandPianoFileDataEnd;
@@ -40,37 +46,61 @@ static MIDIMsgBuilder_State_t lastState;
 static MIDIMsgBuilder midiMsgBuilder;
 static MIDI_Router_Standard midiRouter;
 
-MMTrapEnvedSamplePlayer spsps[MIDI_NUM_NOTES];
+static MMTrapEnvedSamplePlayer spsps[MIDI_NUM_NOTES];
+
+static MMPolyManager *pvm;
+
+static MMWavTab samples;
+
+static MMWavTabRecorder wtr;
+
+static MMSample playbackRate = 1.0;
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
 {
-    if ((msg->data[1] < MIDI_TOP_NOTE) && (msg->data[1] >= MIDI_BOTTOM_NOTE)) {
-        MMTrapEnvedSamplePlayer *tesp = (MMTrapEnvedSamplePlayer*)data 
-            + msg->data[1] - MIDI_BOTTOM_NOTE;
-        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).interp =
-            MMInterpMethod_CUBIC;
-        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).index = 0;
-        MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp).rate =
-            pow(2., (msg->data[1] - 69.) / 10.) * 440.0 / WAVTABLE_FREQ;
-        MMSigProc_setState(
-                &MMEnvedSamplePlayer_getSamplePlayerSigProc(tesp),
-                MMSigProc_State_PLAYING);
-        MMTrapezoidEnv_init(&MMTrapEnvedSamplePlayer_getTrapezoidEnv(tesp),
-            0, (MMSample)msg->data[2] / 127., ATTACK_TIME, RELEASE_TIME);
-        MMEnvelope_startAttack(&MMTrapEnvedSamplePlayer_getTrapezoidEnv(tesp));
-    }
+    MMPvtespParams *params = MMPvtespParams_new();
+    params->paramType = MMPvtespParamType_NOTEON;
+    params->note = (MMSample)msg->data[1];
+    params->amplitude = (MMSample)msg->data[2] / 127.;
+    params->interpolation = MMInterpMethod_CUBIC;
+    params->index = 0;
+    params->attackTime = ATTACK_TIME;
+    /* this is the time a note that is stolen will take to decay */
+    params->releaseTime = SHORT_RELEASE_TIME; 
+    params->samples = &samples;
+    params->loop = 1;
+    params->rate = playbackRate;
+    params->rateSource = MMPvtespRateSource_RATE;
+    MMPolyManager_noteOn(pvm, (void*)params, 
+            MMPolyManagerSteal_FALSE, MMPolyManagerRetrigger_FALSE);
     MIDIMsg_free(msg);
 }
 
 void MIDI_note_off_do(void *data, MIDIMsg *msg)
 {
-    if ((msg->data[1] < MIDI_TOP_NOTE) && (msg->data[1] >= MIDI_BOTTOM_NOTE)) {
-        MMTrapEnvedSamplePlayer *tesp = (MMTrapEnvedSamplePlayer*)data 
-            + msg->data[1] - MIDI_BOTTOM_NOTE;
-        MMEnvelope_startRelease(
-                &MMTrapEnvedSamplePlayer_getTrapezoidEnv(tesp));
-    }
+    MMPvtespParams *params = MMPvtespParams_new();
+    params->paramType = MMPvtespParamType_NOTEOFF;
+    params->note = (MMSample)msg->data[1];
+    params->amplitude = (MMSample)msg->data[2] / 127.;
+    params->releaseTime = RELEASE_TIME;
+    MMPolyManager_noteOff(pvm, (void*)params);
     MIDIMsg_free(msg);
+}
+
+void MIDI_cc_do(void *data, MIDIMsg *msg)
+{
+    if (msg->data[2]) {
+        /* start recording */
+        ((MMWavTabRecorder*)data)->currentIndex = 0;
+        ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_RECORDING;
+    } else {
+        ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_STOPPED;
+    }
+}
+
+void MIDI_cc_rate_control(void *data, MIDIMsg *msg)
+{
+    *((MMSample*)data) = ((MMSample)msg->data[2] - 60.0) / 60. + 1.;
 }
 
 int main(void)
@@ -78,17 +108,19 @@ int main(void)
     MMSample *sampleFileDataStart = WaveTable;
     size_t i;
 
+    /* Enable signalling routines for errors */
+    error_sig_init();
 
-    /* Enable LEDs so we can toggle them */
-    LEDs_Init();
+    /* Enable external SRAM */
+    FMC_Config();
 
     codecDmaTxPtr = NULL;
     codecDmaRxPtr = NULL;
-    
-    /* Enable codec */
-    i2s_dma_full_duplex_setup();
 
-    /* The bus the signal chain is reading/writing */
+    /* The bus the signal chain is reading */
+    MMBus *inBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
+
+    /* The bus the signal chain is writing */
     MMBus *outBus = MMBus_new(BUS_BLOCK_SIZE,BUS_NUM_CHANS);
 
     /* a signal chain to put the signal processors into */
@@ -106,9 +138,24 @@ int main(void)
     WaveTable_init();
 
     /* Give access to samples of sound as wave table */
-    MMWavTab samples;
-    MMArray_set_data(&samples, sampleFileDataStart);
-    MMArray_set_length(&samples,WAVTABLE_LENGTH_SAMPLES);
+    MMArray_set_data(&samples, WaveTable);
+    MMArray_set_length(&samples, WAVTABLE_LENGTH_SAMPLES); 
+    /* Set with this samplerate so it plays at normal speed when midi note 69
+     * received */
+    samples.samplerate = 440 * WAVTABLE_LENGTH_SAMPLES;//CODEC_SAMPLE_RATE;
+
+    /* Allow MMWavTabRecorder to record into samples */
+    MMWavTabRecorder_init(&wtr);
+    wtr.buffer = &samples;
+    wtr.inputBus = inBus;
+    wtr.currentIndex = 0;
+    wtr.state = MMWavTabRecorderState_RECORDING;
+
+    /* Put MMWavTabRecorder at the top of the signal chain */
+    MMSigProc_insertAfter(&sigChain.sigProcs,&wtr);
+
+    /* Make poly voice manager */
+    pvm = MMPolyManager_new(MIDI_NUM_NOTES);
 
     /* Enable MIDI hardware */
     MIDI_low_level_setup();
@@ -119,23 +166,21 @@ int main(void)
     /* set up the MIDI router to trigger samples */
     MIDI_Router_Standard_init(&midiRouter);
     for (i = 0; i < MIDI_NUM_NOTES; i++) {
+        /* Initialize sample player */
         MMTrapEnvedSamplePlayer_init(&spsps[i], outBus, BUS_BLOCK_SIZE, 
                 1. / (MMSample)CODEC_SAMPLE_RATE);
-        MMEnvedSamplePlayer_getSamplePlayerSigProc(&spsps[i]).samples = &samples;
-        MMEnvedSamplePlayer_getSamplePlayerSigProc(&spsps[i]).loop = 1;
-        MMSigProc_setState(
-            &MMEnvedSamplePlayer_getSamplePlayerSigProc(&spsps[i]),
-            MMSigProc_State_DONE);
-        MMSigProc_setDoneAction(
-            &MMEnvedSamplePlayer_getSamplePlayerSigProc(&spsps[i]),
-            MMSigProc_DoneAction_NONE);
-        MMTrapezoidEnv_init(&MMTrapEnvedSamplePlayer_getTrapezoidEnv(&spsps[i]),
-            0, 1, ATTACK_TIME, RELEASE_TIME);
+        /* Make new poly voice and add it to the poly voice manager */
+        MMPolyManager_addVoice(pvm, i, (MMPolyVoice*)MMPvtesp_new(&spsps[i])); 
         /* insert in signal chain after sig const*/
         MMSigProc_insertAfter(&sigConst, &spsps[i]);
     }
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],2,MIDI_cc_do,&wtr);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],3,MIDI_cc_rate_control,&playbackRate);
+
+    /* Enable codec */
+    i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
 
     while (1) {
         while (!(codecDmaTxPtr && codecDmaRxPtr));
@@ -143,12 +188,14 @@ int main(void)
         MMSigProc_tick(&sigChain);
         size_t i;
         for (i = 0; i < CODEC_DMA_BUF_LEN; i += 2) {
+            /* write out data */
             codecDmaTxPtr[i] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
             codecDmaTxPtr[i+1] = FLOAT_TO_INT16(outBus->data[i/2] * 0.01);
+            /* read in data */
+            inBus->data[i/2] = INT16_TO_FLOAT(codecDmaRxPtr[i+1]);
         }
         codecDmaTxPtr = NULL;
         codecDmaRxPtr = NULL;
-        processingDone = 1;
     }
 }
 
