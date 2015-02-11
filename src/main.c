@@ -9,6 +9,7 @@
 #include "error_sig.h" 
 #include "i2s_setup.h" 
 #include "midi_lowlevel.h"
+#include "fmc.h" 
 
 /* mmmidi includes */
 #include "mm_midimsgbuilder.h"
@@ -35,8 +36,8 @@
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
 
 #define ATTACK_TIME 0.01 
-#define RELEASE_TIME 0.5 
-#define SHORT_RELEASE_TIME 0.2
+#define RELEASE_TIME 0.01 
+#define SHORT_RELEASE_TIME 0.01
 
 //extern MMSample GrandPianoFileDataStart;
 //extern MMSample GrandPianoFileDataEnd;
@@ -53,6 +54,8 @@ static MMWavTab samples;
 
 static MMWavTabRecorder wtr;
 
+static MMSample playbackRate = 1.0;
+
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
 {
     MMPvtespParams *params = MMPvtespParams_new();
@@ -66,7 +69,10 @@ void MIDI_note_on_do(void *data, MIDIMsg *msg)
     params->releaseTime = SHORT_RELEASE_TIME; 
     params->samples = &samples;
     params->loop = 1;
-    MMPolyManager_noteOn(pvm, (void*)params, MMPolyManagerSteal_TRUE);
+    params->rate = playbackRate;
+    params->rateSource = MMPvtespRateSource_RATE;
+    MMPolyManager_noteOn(pvm, (void*)params, 
+            MMPolyManagerSteal_FALSE, MMPolyManagerRetrigger_FALSE);
     MIDIMsg_free(msg);
 }
 
@@ -83,9 +89,18 @@ void MIDI_note_off_do(void *data, MIDIMsg *msg)
 
 void MIDI_cc_do(void *data, MIDIMsg *msg)
 {
-    /* start recording */
-    ((MMWavTabRecorder*)data)->currentIndex = 0;
-    ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_RECORDING;
+    if (msg->data[2]) {
+        /* start recording */
+        ((MMWavTabRecorder*)data)->currentIndex = 0;
+        ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_RECORDING;
+    } else {
+        ((MMWavTabRecorder*)data)->state = MMWavTabRecorderState_STOPPED;
+    }
+}
+
+void MIDI_cc_rate_control(void *data, MIDIMsg *msg)
+{
+    *((MMSample*)data) = ((MMSample)msg->data[2] - 60.0) / 60. + 1.;
 }
 
 int main(void)
@@ -162,6 +177,7 @@ int main(void)
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_ON, 1, MIDI_note_on_do, spsps);
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
     MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],2,MIDI_cc_do,&wtr);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],3,MIDI_cc_rate_control,&playbackRate);
 
     /* Enable codec */
     i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
