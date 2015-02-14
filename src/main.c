@@ -10,6 +10,7 @@
 #include "i2s_setup.h" 
 #include "midi_lowlevel.h"
 #include "fmc.h" 
+#include "note_scheduler.h" 
 
 /* mmmidi includes */
 #include "mm_midimsgbuilder.h"
@@ -34,10 +35,17 @@
 
 #define BUS_NUM_CHANS 1
 #define BUS_BLOCK_SIZE (CODEC_DMA_BUF_LEN / CODEC_NUM_CHANNELS)
+#define BLOCKS_PER_SEC (CODEC_SAMPLE_RATE / CODEC_DMA_BUF_LEN) 
 
 #define ATTACK_TIME 0.01 
 #define RELEASE_TIME 0.01 
 #define SHORT_RELEASE_TIME 0.01
+#define NOTE_LENGTH_SEC 5
+#define NOTE_LENGTH_TICKS (NOTE_LENGTH_SEC * BLOCKS_PER_SEC) 
+#define INITIAL_NOTE_DELAY_SEC 10
+#define INITIAL_NOTE_DELAY_TICKS (INITIAL_NOTE_DELAY_SEC * BLOCKS_PER_SEC)
+#define EVENT_PERIOD_SEC 2
+#define EVENT_PERIOD_TICKS (EVENT_PERIOD_SEC * BLOCKS_PER_SEC) 
 
 //extern MMSample GrandPianoFileDataStart;
 //extern MMSample GrandPianoFileDataEnd;
@@ -55,6 +63,9 @@ static MMWavTab samples;
 static MMWavTabRecorder wtr;
 
 static MMSample playbackRate = 1.0;
+
+static int  eventPeriod = EVENT_PERIOD_TICKS;
+static int  eventLength = NOTE_LENGTH_TICKS;
 
 void MIDI_note_on_do(void *data, MIDIMsg *msg)
 {
@@ -101,6 +112,16 @@ void MIDI_cc_do(void *data, MIDIMsg *msg)
 void MIDI_cc_rate_control(void *data, MIDIMsg *msg)
 {
     *((MMSample*)data) = ((MMSample)msg->data[2] - 60.0) / 60. + 1.;
+}
+
+void MIDI_cc_period_control(void *data, MIDIMsg *msg)
+{
+    *((int*)data) = msg->data[2] * 2 + 1;
+}
+
+void MIDI_cc_length_control(void *data, MIDIMsg *msg)
+{
+    *((int*)data) = msg->data[2] * 3 + 1;
 }
 
 int main(void)
@@ -178,12 +199,40 @@ int main(void)
     MIDI_Router_addCB(&midiRouter.router, MIDIMSG_NOTE_OFF, 1, MIDI_note_off_do, spsps);
     MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],2,MIDI_cc_do,&wtr);
     MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],3,MIDI_cc_rate_control,&playbackRate);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],4,MIDI_cc_period_control,&eventPeriod);
+    MIDI_CC_CB_Router_addCB(&midiRouter.cbRouters[0],5,MIDI_cc_length_control,&eventLength);
+
+    /* set up note scheduler */
+    MMSeq *sequence = MMSeq_new();
+    MMSeq_init(sequence, 0);
 
     /* Enable codec */
     i2s_dma_full_duplex_setup(CODEC_SAMPLE_RATE);
 
     while (1) {
         while (!(codecDmaTxPtr && codecDmaRxPtr));
+        if ((MMSeq_getCurrentTime(sequence) % eventPeriod) == 0) {
+            /* Make event */
+            NoteOnEvent *noe = NoteOnEvent_new();
+            MMPvtespParams *params = MMPvtespParams_new();
+            params->paramType = MMPvtespParamType_NOTEON;
+            params->note = get_next_free_voice_number();
+            params->amplitude = 1.0;
+            params->interpolation = MMInterpMethod_CUBIC;
+            params->index = 0;
+            params->attackTime = ATTACK_TIME;
+            params->releaseTime = RELEASE_TIME; 
+            params->samples = &samples;
+            params->loop = 1;
+            params->rate = playbackRate;
+            params->rateSource = MMPvtespRateSource_RATE;
+            NoteOnEvent_init(noe,pvm,params,sequence,eventLength);
+            /* Schedule event to happen now */
+            MMSeq_scheduleEvent(sequence,(MMEvent*)noe,MMSeq_getCurrentTime(sequence));
+        }
+        /* Do scheduled events and tick */
+        MMSeq_doAllCurrentEvents(sequence);
+        MMSeq_tick(sequence);
         MIDI_process_buffer(); /* process MIDI at most every audio block */
         MMSigProc_tick(&sigChain);
         size_t i;
