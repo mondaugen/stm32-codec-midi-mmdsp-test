@@ -6,6 +6,8 @@
 
 #define NOTE_SCHED_MAX_NUM_VOICES 8
 
+extern uint32_t voiceStates;
+
 typedef struct __NoteOnEvent NoteOnEvent;
 typedef struct __NoteOffEvent NoteOffEvent;
 
@@ -28,6 +30,7 @@ void NoteOnEvent_happen(MMEvent *event);
 NoteOnEvent *NoteOnEvent_new(void);
 NoteOffEvent *NoteOffEvent_new(void);
 int get_next_free_voice_number(void);
+void yield_params_to_allocator(void *allocator, void *params);
 
 #define NoteOffEvent_init(noe,_pvm,_params)\
     ((MMEvent*)(noe))->happen = NoteOffEvent_happen;\
